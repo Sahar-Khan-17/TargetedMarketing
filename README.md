@@ -1,7 +1,6 @@
-# TargetedMarketing
-TargetedMarketing- Customer Segmentation model for Campaigns
+# TargetedMarketing- Customer Segmentation model for Campaigns
 
-#Objective:
+# Objective:
 The objective of ‘Targeted Marketing’ is to develop a segmentation model for “GetAllMart” that leverages
 customer behavior and purchasing patterns to identify opportunities for higher campaign profits and targeted
 marketing efforts. By meeting the unique needs of specific customer segments, we aim to increase customer
@@ -14,7 +13,7 @@ the company’s marketing strategy.
 
 ![image](https://user-images.githubusercontent.com/116682872/234663811-178a75e5-3a9a-459c-83a2-befe04d8c213.png)
 
-#Findings from Clustering:
+# Findings from Clustering:
 Based on the demographics, spend patterns, and responses to the current campaign strategy we have identified
 four distinct customer segments (Clusters) (refer Table 1).
 1. The first segment consists of loyal customers with household size ~ 2. However, they do not respond
@@ -33,7 +32,7 @@ has a household size ~2 and slightly leaning towards single person household. Th
 engaged the most with “GetAllMart” across product categories and are most profitable. They respond
 well to the personalized campaigns however they don’t seem to engage with us on store wide deals.
 
-#Recommendations for each Cluster:
+# Recommendations for each Cluster:
 1. For the first cluster, it is evident that the current marketing campaigns focused on Wine & Meat
 are not working. We recommend testing a completely different offer focused on daily groceries and
 assessing its performance to see if the response rate goes up.
