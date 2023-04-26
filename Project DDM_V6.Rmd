@@ -1,0 +1,926 @@
+---
+title: "Targeted Marketing for GetAllMart"
+author: "Insights Squad : Sahar K, Nupur U, Rachana S, Hima S"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Objective:** 
+
+The objective of 'Targeted Marketing' is to develop a segmentation model for *"GetAllMart"* that leverages customer behavior and purchasing patterns to identify opportunities for higher campaign profits and targeted marketing efforts. By meeting the unique needs of specific customer segments, we aim to increase customer satisfaction and loyalty while maximizing campaign profits, ultimately improving the overall effectiveness of the company's marketing strategy.
+
+
+**Assumptions and Modifications:**
+
+To analyze the data and make an objective conclusion, we made certain assumptions and modifications to the information we had available. These include:
+
+1. Assuming our marketing campaigns focuses on wines and meats, as indicated by past campaign performance with these two product categories.
+2. Looked at total product sales across all categories and campaign sales to understand customers’ total spending.
+3. Evaluated the impact of tenure of the customer with *"GetAllMart"* to distinguish between new and existing customers, determine loyalty, and understand purchase trends for targeted offers.
+4. Estimated Household Size by considering the Marital Status, number of kids & teens at home as marketing spends are usually dependent on the household demographics.
+
+**Findings from Exploratory Data Analysis:**
+
+1. Total Spend and Income: The analysis shows a fair amount of customer concentrated below $30,000 *(refer Fig 1 & 3)* and display low spending. However above threshold of 45,000 customers purchasing power shows a increase with increase in Spend.
+
+2. Customer Seniority and Spend: Our analysis revealed a positive relation between customer seniority and total spend *(refer Fig 1)*. However we cannot make strong conclusions on this trend as the customer data was limited to 2 years.
+
+3. Age and Spend : Age did not seem to correlate strongly with either total purchases, total campaign and non campaign spend *(refer Fig 1)*.
+
+4. Household Size and Spend : Household Size seems to correlate negatively with non campaign spend *(refer Fig 1)* indicating bigger households tend to shop less at *"GetAllMart"*.
+
+5. Campaign Performance and Products: Our evaluation of the campaign performance showed that customers who respond highly to campaigns tend to make purchases in Wine and Meat categories *(refer Fig 2)*. 
+
+6. Products and Spend: Spend patterns of *"GetAllMart"* indicate people across groups prefer to shop mainly Wine and Meat here *(refer Fig 2)*.
+
+**Findings from Clustering:**
+
+Based on the demographics, spend patterns, and responses to the current campaign strategy we have identified four distinct customer segments (Clusters) *(refer Table 1)*.
+
+1. The first segment consists of loyal customers with household size ~ 2. However, they do not respond well to campaigns nor store wide deals despite being active on all purchase platforms. These customers have been with us for about a year and are in the high income category.
+
+2. The second segment consists of medium income customers with household size ~3. These customers have been with our company the longest and respond highly to deals. However when it comes to personalized campaigns, they have a moderate response as evidenced by the average revenue earned from each customer.
+
+3. The third segment consists of low-income customers who are relatively new to *"GetAllMart"* and have household size ~3. Their campaign and non-campaign spend patterns are lowest among all groups indicating the lack of purchasing power. They do not respond well to store wide deals nor Campaigns. In fact the company is losing money by targeting this segment.  
+
+4. The fourth segment consists of high-income customers who are about a year old with *"GetAllMart"*, has a household size ~2 and slightly leaning towards single person household. These customers are engaged the most with *"GetAllMart"* across product categories and are most profitable. They respond well to the personalized campaigns however they don't seem to engage with us on store wide deals.   
+
+**Recommendations for each Cluster:**
+
+1. For the first cluster, it is evident that the current marketing campaigns focused on Wine & Meat are not working. We recommend testing a completely different offer focused on daily groceries and assessing its performance to see if the response rate goes up. 
+
+2. For the second cluster, we suggest conducting A/B testing between the current offer focused on Wine & Meat and the new offer focused on fruit, fish, and sweets. Since this group belongs to medium income category and household size ~3 there is potential that they would respond well to offer focused on daily groceries. This will help evaluate if there is an other promotion mix that will make them even more profitable. 
+
+3. For the third customer cluster, we recommend not targeting them for future campaigns as our analysis shows that the cost of targeting this cluster is $3 while the profits are negative. However, if we do decide to target this cluster in future, we suggest sending offers on daily household groceries instead of pricier items such as wines as a household with kids/teens and lower income tends to look for offers in food category.
+
+4. For the fourth cluster, we believe our current marketing strategy is highly profitable and recommend keeping the same strategy for this cluster.
+
+**Limitations:**
+
+One limitation of our analysis is that the exact offer details from previous campaigns are unknown. This limits our ability to understand the relationship between the offers, product demand, and the response received
+
+```{r, echo=FALSE, results='hide', include = FALSE}
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(scales)
+library(readxl)
+library(lares) 
+library(sqldf)
+library(reshape2)
+library(tidyverse)
+library(cluster)
+library(ggplot2)
+library(gower)
+library(Rtsne)
+library(stringr)
+library(corrgram)
+library(dplyr)
+library(lubridate)
+library(RColorBrewer)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+ds <- read_excel("marketing_campaign.xlsx")
+ds$ID <- as.character(ds$ID)
+ds$Dt_Customer <- as.Date(ds$Dt_Customer)
+
+colnames(ds)[colnames(ds) == "MntWines"] <- "WineSales"
+colnames(ds)[colnames(ds) == "MntMeatProducts"] <- "MeatSales"
+colnames(ds)[colnames(ds) == "MntFruits"] <- "FruitSales"
+colnames(ds)[colnames(ds) == "MntFishProducts"] <- "FishSales"
+colnames(ds)[colnames(ds) == "MntSweetProducts"] <- "SweetSales"
+colnames(ds)[colnames(ds) == "MntGoldProds"] <- "GoldSales"
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#check missing values
+colSums(is.na(ds))
+#Income has 24 missing values
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+chk <- ds[!complete.cases(ds),]
+#24 obs out of 2240 have NA -- delete these rows and move ahead as it is just 1% of the dataset
+#Sahar: I had imputed with median, not adding that step
+
+ds<-ds[complete.cases(ds),]
+#2216 rows - Missing values removed
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Rechecking
+colSums(is.na(ds))
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# understand customer is New Vs Regular, assigning seniorty 
+library(lubridate)
+
+ds$CustomerSeniority <- year("2014-01-01")-year(ds$Dt_Customer)
+table(ds$CustomerSeniority)
+
+ds$CBrandAgeQ <- round(as.numeric(difftime("2015-01-01", ds$Dt_Customer, units = "days"))/91)
+table(ds$CBrandAgeQ)
+
+ds$CBrandAgeM <- round(as.numeric(difftime("2015-01-01", ds$Dt_Customer, units = "days"))/30.44)
+table(ds$CBrandAgeM)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+summary(ds) 
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Analyze people attributes
+# <!-- ID: Customer's unique identifier -->
+# <!-- Year_Birth: Customer's birth year -->
+# <!-- Education: Customer's education level -->
+# <!-- Marital_Status: Customer's marital status -->
+# <!-- Income: Customer's yearly household income -->
+# <!-- Kidhome: Number of children in customer's household -->
+# <!-- Teenhome: Number of teenagers in customer's household -->
+# <!-- Dt_Customer: Date of customer's enrollment with the company -->
+# <!-- Recency: Number of days since customer's last purchase -->
+# <!-- Complain: 1 if the customer complained in the last 2 years, 0 otherwise -->
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#We have Year_Birth instead of Age -- this dataset is from 2014, so create Age and Age_groups
+# convert year_of_birth to date format with only year
+
+# convert Year_Birth to POSIXct format
+ds$Year_Birth <- as.POSIXct(paste0(ds$Year_Birth, "-01-01"))
+
+# calculate age using difftime, Same as my file so not changing this part
+ds$Age <- round(as.numeric(difftime(as.POSIXct("2014-01-01"), ds$Year_Birth, units = "secs") / (60 * 60 * 24 * 365.25)))
+
+# extract year from date
+ds$Year_Birth <- format(ds$Year_Birth, "%Y")
+#2240 rows
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Check for null values in the data frame
+colSums(is.na(ds))
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+hist(ds$Age)
+summary(ds$Age)
+#3 individuals above 100 age -- outliers?
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+# calculate mean and standard deviation
+mean_x <- mean(ds$Age)
+sd_x <- sd(ds$Age)
+
+# identify rows outside mean +/- 3 standard deviations
+outliers <- ds$Age< (mean_x - 3*sd_x) | ds$Age > (mean_x + 3*sd_x)
+outlier_rows <- which(outliers)
+
+# view outlier rows
+Inc_OL = ds[outlier_rows,]
+Inc_OL
+
+#All 3 outliers are > 100 age -- Delete them
+
+#remove outliers
+ds = ds[!outliers,]
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Create income categories based on age demographics
+ds <- ds %>%
+  mutate(ageCat = if_else(Age < 35, '18-34',
+                     if_else(Age < 60, '35-60', '60+')))
+table(ds$ageCat)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Income histogram
+ggplot(ds, aes(x = Income)) +
+  geom_histogram(fill = "blue", color = "black")
+summary(ds$Income) 
+# the max is too high.. indicating a potential outlier
+
+#Try log(Income)
+ggplot(ds, aes(x = log(Income))) +
+  geom_histogram(fill = "blue", color = "black")
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Sahar: Library issue, cannot run the this part
+
+# library(lares)
+# corr_var(ds, # name of dataset
+# Income, # name of variable to focus on
+# top = 30 # display top 30 correlations
+# ) +
+# theme(text = element_text(family = "Arial"))
+
+#Income has higher correlation with Catalog purchases, meat prods, wines, store purchases, sweet prods, fish prods, fruits
+#-ve correlation with web visits and more kids
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Sahar: Written an alternate code for the above issue
+
+# select only numeric columns
+# num_cols <- sapply(ds, is.numeric)
+# 
+# # calculate correlations
+# corrs <- cor(ds[, num_cols], use = "complete.obs")
+# 
+# # sort correlations in descending order of absolute value
+# sorted_corrs <- sort(abs(corrs[,"Income"]), decreasing = TRUE)
+# 
+# # display top 30 correlations
+# top_corrs <- head(sorted_corrs, 30)
+# names(top_corrs)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# calculate mean and standard deviation
+mean_x <- mean(ds$Income)
+sd_x <- sd(ds$Income)
+
+# identify rows outside mean +/- 3 standard deviations
+outliers <- ds$Income< (mean_x - 3*sd_x) | ds$Income > (mean_x + 3*sd_x)
+outlier_rows <- which(outliers)
+
+# view outlier rows
+Inc_OL = ds[outlier_rows,]
+Inc_OL
+
+#All 8 outliers are part of High category -- Delete them
+
+#remove outliers
+ds = ds[!outliers,]
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Check updated Income histogram
+ggplot(ds, aes(x = Income)) +
+  geom_histogram(fill = "blue", color = "black")
+summary(ds$Income) 
+# looks uniformly distributed
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Create Incomecat
+
+# Calculate quartiles
+q1 <- quantile(ds$Income, 0.25)
+q3 <- quantile(ds$Income, 0.75)
+
+# Create income categories based on quartiles
+ds <- ds %>%
+  mutate(incomeCat = if_else(Income < q1, 'Low',
+                     if_else(Income < q3, 'Medium', 'High')))
+
+table(ds$incomeCat)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# select columns to calculate frequency tables for
+selected_columns <- c("Education","Marital_Status","Kidhome","Teenhome","Complain","ageCat","incomeCat")
+
+# calculate frequency tables for selected columns
+freq_tables <- lapply(ds[selected_columns], table)
+
+# print the frequency tables
+freq_tables
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#use a function!
+mySummary = function(groupVar) {
+  ds %>% 
+    group_by({{groupVar}}) %>% #notice the {{}} around the variable name, see ?dplyr_data_masking
+    summarise(Tot_Customers = n(),
+              avgIncome = mean(Income),
+              sdIncome = sd(Income))
+}
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+mySummary(Education)
+#with increase in education level, income seems to increase
+
+catDist = prop.table(table(ds$Education))*100 #in % levels
+catDist
+#Can Basic and 2n cycle be combined? Based on definition of 2n Cycle, it seems closer to Graduation -- Combining it
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+
+ds = ds %>%
+  mutate(ED_Reduced = if_else(Education %in% lowCat,'Basic',Education))
+prop.table(table(ds$ED_Reduced))*100 #in % levels
+
+mySummary(ED_Reduced)
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+mySummary(Marital_Status)
+
+catDist = prop.table(table(ds$Marital_Status))*100 #in % levels
+catDist
+#There are some segments that can be combined
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+
+ds = ds %>%
+  mutate(MR_Reduced = if_else(Marital_Status %in% lowCat,'Other',Marital_Status))
+prop.table(table(ds$MR_Reduced))*100 #in % levels
+
+mySummary(MR_Reduced)
+#fairly flat distribution
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+mySummary(Kidhome)
+#Homes with kids have less income comparatively
+
+catDist = prop.table(table(ds$Kidhome))*100 #in % levels
+catDist
+#just 3 categories and only one under 10% -- no point creating new segments
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+mySummary(Teenhome)
+#Closer distribution across categories
+
+catDist = prop.table(table(ds$Teenhome))*100 #in % levels
+catDist
+#just 3 categories and only one under 10% -- no point creating new segments
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Create number of adults and Household size
+ds$num_adults <- if_else(ds$MR_Reduced %in% c("Married","Together"),2,1)
+ds$HHSize <- rowSums(ds[, c("num_adults", "Kidhome", "Teenhome")])
+ggplot(ds, aes(x = HHSize)) +
+  geom_histogram(fill = "blue", color = "black",binwidth = 1)
+mySummary(HHSize)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+mySummary(Complain)
+#People who complained seemed to have lower income
+
+
+catDist = prop.table(table(ds$Complain))*100 #in % levels
+catDist
+#just 2 categories and only one under 10% -- no point creating new segments
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+hist(ds$Recency)
+#mostly flat distribution but tapering off slightly as Recency increases
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Analyze Promotion attributes
+# <!-- NumDealsPurchases: Number of purchases made with a discount -->
+# <!-- AcceptedCmp1: 1 if customer accepted the offer in the 1st campaign, 0 otherwise -->
+# <!-- AcceptedCmp2: 1 if customer accepted the offer in the 2nd campaign, 0 otherwise -->
+# <!-- AcceptedCmp3: 1 if customer accepted the offer in the 3rd campaign, 0 otherwise -->
+# <!-- AcceptedCmp4: 1 if customer accepted the offer in the 4th campaign, 0 otherwise -->
+# <!-- AcceptedCmp5: 1 if customer accepted the offer in the 5th campaign, 0 otherwise -->
+# <!-- Response: 1 if customer accepted the offer in the last campaign, 0 otherwise -->
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Total Response. Note: In my file the same column is called - num_cmp
+
+ds$CampaignResponse <- rowSums(ds[, c("AcceptedCmp1", "AcceptedCmp2", "AcceptedCmp3", "AcceptedCmp4", "AcceptedCmp5","Response")])
+table(ds$CampaignResponse)
+
+ggplot(ds, aes(x = CampaignResponse)) +
+  geom_histogram(fill = "blue", color = "black",binwidth = 1)
+
+#People who respond to more campaigns, will have higher revenue contribution
+#Since average revenue per campaign is $11 (Z_Revenue -- Revenue after client accepting campaign), multiply this value with CampaignResponse to see distribution
+#Also Z_CostContact -- Cost to contact a customer
+
+#Campaign Revenue column
+ds$CampaignRevenue <- ds$CampaignResponse*ds$Z_Revenue
+
+catDist = prop.table(table(ds$CampaignResponse))*100 #in % levels
+catDist
+
+lowCat = names(catDist[catDist< 10])
+lowCat
+
+ds = ds %>%
+  mutate(Resp_Reduced = if_else(CampaignResponse %in% lowCat,'GT1response',if_else(CampaignResponse==1,"1response","0response")))
+
+table(ds$Resp_Reduced)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Sahar: Adding additional columns before EDA starts
+
+#created a column showing the total amount a customer spent
+ds$NonCampaignRevenue <- ds$MeatSales + ds$WineSales + ds$FruitSales + ds$FishSales + ds$SweetSales + ds$GoldSales
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#checks how much of a customer's income is spent purchasing these products
+ds$Income_to_spend <- round(ds$NonCampaignRevenue / (2*ds$Income), 3)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#No of purchases the customer made
+ds$TotalNumPurchases <- ds$NumWebPurchases + ds$NumCatalogPurchases + ds$NumStorePurchases
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#number of purchases that were discounted
+ds$num_discounted <- round(ds$NumDealsPurchases / ds$TotalNumPurchases, 3)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+ds$deals_tot = if_else(ds$NumDealsPurchases>ds$TotalNumPurchases,1,0)
+table(ds$deals_tot)
+#delete these 3 rows
+ds = subset(ds, deals_tot==0)
+#2202 rows after deletion
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+##Check which percent of purchases that were made per platform
+
+# Create web_to_total column
+ds$web_to_total <- round(ds$NumWebPurchases / ds$TotalNumPurchases, 3)
+
+# Create catalog_to_total column
+ds$catalog_to_total <- round(ds$NumCatalogPurchases / ds$TotalNumPurchases, 3)
+
+# Create Store_to_total column
+ds$Store_to_total <- round(ds$NumStorePurchases / ds$TotalNumPurchases, 3)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Plot Hhsize and Amt spent w
+ggplot(ds, aes(x = as.factor(HHSize), y = NonCampaignRevenue)) +
+  geom_boxplot() +
+  xlab("HHSize") +
+  ylab("Total Amount Spent") +
+  ggtitle("Relationship between Total Amount Spent and Householdsize") +
+  theme_minimal()
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Distribution of amount spent, Looks Skewed  
+hist(ds$NonCampaignRevenue)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Impact of education on income using a boxplot
+boxplot(ds$Income ~ ds$ED_Reduced, ylab = "Income", xlab = "Education")
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#checked the income range between different marital_statuses
+ggplot(ds, aes(x = as.factor(MR_Reduced), y = Income)) +
+  geom_boxplot() +
+  xlab("Marital Status") +
+  ylab("Income") + theme_minimal()
+
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+ # scatter plot of total amount spent and total number purhcases (linear model to fit)
+ggplot(ds, aes(x = NonCampaignRevenue, y = TotalNumPurchases)) + geom_point() + geom_smooth(method = "lm")
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+table(ds$CampaignResponse)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+ds$CampaignRevenue <- ds$CampaignResponse*ds$Z_Revenue
+ds$Profit = ds$CampaignRevenue - ds$Z_CostContact
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+  ds %>%
+    group_by(CampaignResponse) %>% 
+    summarise(Tot_Customers = n(),
+           avgNonCampaignRevenue = mean(NonCampaignRevenue),
+              sdNonCampaignRevenue = sd(NonCampaignRevenue),
+           sumtot = sum(NonCampaignRevenue),
+           sum_CampaignRevenue = sum(CampaignRevenue),
+           SumMail = sum(Z_CostContact),
+           SumProfit = sum(Profit),
+           AvgProfit = mean(Profit),
+           diff_rev =  sum(NonCampaignRevenue)-sum(CampaignRevenue)
+           )
+
+#Evaluate customer spend with number of campaign responses. Profitability for the campaign is high when people respond to more campaigns
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Education and Age
+edu_plot<- ggplot(data = ds, aes(Age, fill = ED_Reduced))
+edu_plot + geom_histogram() 
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Income and Total Spent
+inc_plt <- ggplot(data = ds, aes(Income, NonCampaignRevenue))
+inc_plt + geom_point(alpha = 0.5, color = "blue") + scale_x_continuous(labels = comma)
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Customer Seniority & Amount Spent
+
+cust_plt <- ggplot(data = ds, aes(as.factor(CustomerSeniority), NonCampaignRevenue, fill = CustomerSeniority))
+
+cust_plt + geom_boxplot(color = "black")
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+##Error due to Library issue
+
+#How does response to campaign impact purchases?
+# corr_var(ds, # name of dataset
+#   CampaignResponse, # name of variable to focus on 
+#   top = 30 # display top 30 correlations
+# ) +
+# theme(text = element_text(family = "Arial"))
+
+#People who responded to Campaign 6,5,1 had overall higher campaign response rate
+
+#Seems like campaign response +vely correlates with WineSales, NumCatalogPurchases, high income, MeatSales, NumWebpurchases, GoldSales, Mntsweetprods
+
+#campaign response -vely correlates with HHSize, kidhome, low & med income cat
+
+#overall income has +ve correlation but when we look at the categories we see the true picture
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Overall which campaign had the most response?
+library(sqldf)
+
+ind_cmp_resp <- sqldf("select 
+                          sum(AcceptedCmp1) as Cmp1_resp,
+                          sum(AcceptedCmp2) as Cmp2_resp,
+                          sum(AcceptedCmp3) as Cmp3_resp,
+                          sum(AcceptedCmp4) as Cmp4_resp,
+                          sum(AcceptedCmp5) as Cmp5_resp,
+                          sum(Response) as Cmp6_resp
+                       from ds 
+                      ")
+ind_cmp_resp
+#seems like Campaign 2 had the most dismal performance
+#Campaign 1, 3, 4, 5 are on similar levels
+#Campaign 6 has the highest response
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+table(ds$NumDealsPurchases)
+hist(ds$NumDealsPurchases)
+#more customers with lower deal purchases -- long right tail distribution
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Analyze Product attributes
+# <!-- WineSales: Amount spent on wine in last 2 years -->
+# <!-- FruitSales: Amount spent on fruits in last 2 years -->
+# <!-- MeatSales: Amount spent on meat in last 2 years -->
+# <!-- FishSales: Amount spent on fish in last 2 years -->
+# <!-- SweetSales: Amount spent on sweets in last 2 years -->
+# <!-- GoldSales: Amount spent on gold in last 2 years -->
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# select columns to calculate frequency tables for
+selected_columns <- c("WineSales","FruitSales","MeatSales","FishSales","SweetSales","GoldSales")
+
+# calculate frequency tables for selected columns
+freq_tables <- summary(ds[selected_columns], table)
+
+# print the frequency tables
+freq_tables
+
+#Order of sales
+#Wines > Meat > Gold > Fish > Sweet > Fruits
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+library(reshape2)
+# create a new dataframe by stacking the columns
+ds_melt <- melt(ds[selected_columns])
+
+# create a histogram using ggplot2
+ggplot(ds_melt, aes(x=value)) +
+  geom_histogram(fill = "darkgreen", color = "black",bins=20) +
+  facet_wrap(~variable, scales="free_x")
+#long right tail distribution
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Libary issue
+
+#How does response to campaign impact purchases?
+# corr_var(ds, # name of dataset
+#   NonCampaignRevenue, # name of variable to focus on 
+#   top = 30 # display top 30 correlations
+# ) +
+# theme(text = element_text(family = "Arial"))
+
+#Seems like total revenue +vely correlates with Wines, Meat, Fish, Fruits among products
+#high income and total purchases
+#catalog & store purchases in location
+
+#total revenue -vely correlates with kidhome, low income cat, websitevisits, HHSize, non-response to campaigns
+
+#overall income has +ve correlation but when we look at the categories we see the true picture
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Analyze Place attributes
+# <!-- NumWebPurchases: Number of purchases made through the company’s website -->
+# <!-- NumCatalogPurchases: Number of purchases made using a catalog -->
+# <!-- NumStorePurchases: Number of purchases made directly in stores -->
+# <!-- NumWebVisitsMonth: Number of visits to company’s website in the last month -->
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# select columns to calculate frequency tables for
+selected_columns <- c("NumWebPurchases","NumCatalogPurchases","NumStorePurchases","NumWebVisitsMonth")
+
+# calculate frequency tables for selected columns
+freq_tables <- summary(ds[selected_columns], table)
+
+# print the frequency tables
+freq_tables
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# create a new dataframe by stacking the columns
+ds_melt <- melt(ds[selected_columns])
+
+# create a histogram using ggplot2
+ggplot(ds_melt, aes(x=value)) +
+  geom_histogram(fill = "darkgreen", color = "black",bins=15) +
+  facet_wrap(~variable, scales="free_x") 
+```
+\vfill
+\clearpage
+
+**Fig 1 : Demographics vs Purchase Correlation Matrix**
+
+```{r, echo=FALSE, results='hide',fig.width=7, fig.height=4}
+#how does number of purchases relate with amount spent on various categories
+selected_columns <- c("TotalNumPurchases","NumDealsPurchases",
+                      "NumWebVisitsMonth",
+                      "Income","HHSize","Age","CustomerSeniority","NonCampaignRevenue"
+                      )
+
+#Wines > Meat > Gold > Fish > Sweet > Fruits
+library(ggcorrplot)
+
+cor_matrix <- cor(ds[, selected_columns])
+
+# plot the correlation matrix
+ggcorrplot(cor_matrix, type = "lower", hc.order = FALSE, lab = TRUE, lab_size=2.5, insig="blank", colors=c("Red","Yellow","Darkgreen")) 
+
+# More webvisits doesn't translate to higher sales or purchases -- probably people are frustrated as they are not getting what they like at their desired offer point
+
+#The matrix is ordered basis hclust function -- hclust() is used to group together variables that are highly correlated with each other, and to separate out variables that are less correlated. By using hclust() to order the correlation matrix, the resulting heatmap will display the variables in an order that reflects their underlying patterns of correlation.
+
+# Wines, Meat & Fruits are top product categories
+# Store, Catalog purchases are the preferred choice for more purchases
+```
+
+**Fig 2: Product Sales vs Revenue Correlation Matrix**
+
+```{r, echo=FALSE, results='hide',fig.width=7, fig.height=4}
+#how does number of purchases relate with amount spent on various categories
+selected_columns <- c("WineSales","MeatSales","GoldSales",
+                      "FishSales","SweetSales","FruitSales",
+                      "CampaignRevenue","NonCampaignRevenue"
+                      )
+
+#Wines > Meat > Gold > Fish > Sweet > Fruits
+library(ggcorrplot)
+
+cor_matrix <- cor(ds[, selected_columns])
+
+# plot the correlation matrix
+ggcorrplot(cor_matrix, type = "lower", hc.order = FALSE, lab = TRUE, lab_size=2.5, insig="blank", colors=c("Red","Yellow","Darkgreen")) 
+
+# More webvisits doesn't translate to higher sales or purchases -- probably people are frustrated as they are not getting what they like at their desired offer point
+
+#The matrix is ordered basis hclust function -- hclust() is used to group together variables that are highly correlated with each other, and to separate out variables that are less correlated. By using hclust() to order the correlation matrix, the resulting heatmap will display the variables in an order that reflects their underlying patterns of correlation.
+
+# Wines, Meat & Fruits are top product categories
+# Store, Catalog purchases are the preferred choice for more purchases
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+###### Cluster Analysis starts here
+
+#Scaling all variables as correlation is sensitive to scaling
+#select all numeric columns
+numeric_cols <- ds %>% select_if(is.numeric)
+#51 columns and 2202 observations
+
+#Data Scaling
+ds_scaled <- sapply(numeric_cols,scale)
+ds_scaled_df = data.frame(ds_scaled)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#How does response to campaign impact purchases?
+# corr_var(ds_scaled_df, # name of dataset
+#   CampaignResponse, # name of variable to focus on 
+#   top = 30 # display top 40 correlations
+# )
+
+#   People who responded to Campaign 6,5,1 had overall higher campaign response rate
+#   Seems like campaign response +vely correlates with WineSales, NumCatalogPurchases, high income, MeatSales
+#   campaign response -vely correlates with HHSize, kidhome, low & med income cat
+#   overall income has +ve correlation but when we look at the categories we see the true picture
+
+
+#The marketing strategy for higher response to campaigns given below:
+#   top products (WineSales, MeatSales) 
+#   top purchase locations (NumCatalogPurchases)
+#   personal attributes (Income, -vely HHSize)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+library(cluster)
+library(mclust)
+library(factoextra)
+library(ggplot2)
+
+ds_sub <- subset(ds, select = c(
+                    "Income","HHSize","CustomerSeniority",
+                    "WineSales","MeatSales","FruitSales","FishSales",
+                    "SweetSales","GoldSales",
+                    "NumCatalogPurchases","NumWebPurchases","NumStorePurchases",
+                    "NumDealsPurchases","NumWebVisitsMonth",
+                    "Profit"
+                    ))
+
+#Data Scaling
+ds_sub_scaled <- sapply(ds_sub,scale)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Determine the optimal number of clusters using the elbow method, K = 4
+wss = map_dbl(1:10, function(k) {
+  kmeans(ds_sub_scaled, k, nstart = 10)$tot.withinss
+})
+
+# Plot the results
+tibble(k = 1:10, wss = wss) %>%
+  ggplot(aes(k, wss)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(breaks = 1:10)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Perform k-means clustering with 4 clusters
+set.seed(4);kmeans_result = kmeans(ds_sub_scaled, centers = 4)
+
+# Add the cluster assignments to the data frame
+ds_sub$Cluster = kmeans_result$cluster
+ds_sub$Cluster = as.factor(ds_sub$Cluster)
+
+# Define colors based on cluster
+colors <- brewer.pal(n = length(unique(ds_sub$Cluster)), name = "Set1")
+
+# Plot the distribution of the clusters
+ds_sub %>%
+  ggplot(aes(x = Cluster, fill = Cluster)) +
+  geom_bar() +
+  scale_fill_manual(values = colors) + 
+  ggtitle("Distribution Of the K-means Clusters") +
+  xlab("Cluster") +
+  ylab("Frequency")
+
+```
+```{r, echo=FALSE, results='hide', include=FALSE}
+# Clustering Plot with Customizations
+clusplot(ds_sub, kmeans_result$cluster, color = TRUE,
+         main = "K-Means Classification (k=4)", cex = 0.5, col.p = brewer.pal(4, "Set1"),
+         )
+
+# Add the legend
+legend("bottomright", legend = unique(kmeans_result$cluster), col = brewer.pal(4, "Set1"), pch = 19)
+```
+
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+table(kmeans_result$cluster)
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+cluster_means <- aggregate(ds_sub, by=list(kmeans_result$cluster), mean)
+cluster_means
+
+cluster_sums <- aggregate(ds_sub$Profit, by=list(kmeans_result$cluster), sum)
+cluster_sums
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+ds_new = cbind(ds,ds_sub$Cluster)
+colnames(ds_new)[colnames(ds_new) == "ds_sub$Cluster"] <- "Cluster"
+```
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+  ds_new %>%
+    group_by(Cluster) %>% 
+    summarise(Tot_Customers = n(),
+           avgNonCampaignRevenue = mean(NonCampaignRevenue),
+           sdNonCampaignRevenue = sd(NonCampaignRevenue),
+           sumtot = sum(NonCampaignRevenue),
+           avgWines = mean(WineSales/NonCampaignRevenue),
+           avgMeat = mean(MeatSales/NonCampaignRevenue),
+           avgFruit = mean(FruitSales/NonCampaignRevenue),
+           avgFish = mean(FishSales/NonCampaignRevenue),
+           avgGold = mean(GoldSales/NonCampaignRevenue),
+           avgSweets = mean(SweetSales/NonCampaignRevenue),
+           SumProfit = sum(Profit),
+           AvgProfit = mean(Profit),
+           diff_rev =  sum(NonCampaignRevenue)-sum(CampaignRevenue)
+           )
+```
+\vfill
+\clearpage
+
+**Table 1 : Summary of key features for the 4 clusters**
+
+**Category** | **Cluster 1** | **Cluster 2** | **Cluster 3** | **Cluster 4** |
+--------|-------|-------|---------|---------|
+Total Customers | 475 | 561 | 1,001 | 165 |
+Income Category |  High | Medium | Low | High |
+Average Household Size | 2 | 3 | 3 | 2 |
+Average Tenure within Company (years) | 0-1 | 1-2 | 0-1 | 1 |
+Preferred Products | Fruit, Fish, & Sweets | Wine | Fruit, Fish, & Sweets | Wine & Meat |
+Preferred Purchase Location | All | Web, & Store | Store | All |
+Prefer Daily Deals | No | Yes | No | No |
+Average Non-Campaign Revenue | \$1,233 | \$692 | \$94 | \$1,640 |
+Average Campaign Revenue | \$3 | \$4 | \$2 | \$32 |
+Average Campaign Profit | \$0 | \$1 | -\$1 | \$29 |
+
+```{r, echo=FALSE, results='hide', include=FALSE}
+#Assumption : Currently focuses on Wines and Meat -- evident by +ve campaign performance
+
+#Cluster 1: Loyal customers, Household with teen/children but do not respond to campaigns -- active on both web and store -- about a year old in the system -- Moderately high income, HHSize > 2 (2~3) -- we are not losing or making money -- next steps standpoint test a completely different offer and assess performance (focused on daily groceries) -- A/B Testing between current offer and new offer
+
+#Cluster 2: Medium Income, Household with teen/children, have been with the company the longest,  -- Responds moderately to campaigns and highly to deals -- can cater them with different offer that will increase their response rate -- offer focused on Fruit, Fish, Sweets
+
+#Cluster 3: Low Income category (low spend potential), relatively new customers -- Don't target them for future campaigns -- but if we have to target then send offer on daily household groceries instead on wines which is pricier 
+
+#Cluster 4: Campaigns are efficiently targeted for this cluster -- high income, HHSize <2 -- keep the same strategy
+```
+
+**Fig 3: Income vs. Total Spend by Cluster**
+
+```{r, echo=FALSE, results='hide',fig.width=7, fig.height=4}
+ds_new$Cluster = as.factor(ds_new$Cluster)
+ds_new$TotSpend <- rowSums(ds_new[, c("NonCampaignRevenue", "CampaignRevenue")])
+
+# create a vector of colors
+colors <- brewer.pal(n = length(unique(ds_new$Cluster)), name = "Set1")
+
+# plot
+inc_plt <- ggplot(data = ds_new, aes(x = Income, y = TotSpend, color = Cluster)) +
+  geom_point(alpha = 0.5) +
+  scale_color_manual(values = colors) + 
+  ylab('Total Spend ($)') + 
+  xlab('Income ($)') +
+  scale_x_continuous(labels = dollar_format()) +
+  scale_y_continuous(labels = dollar_format()) 
+  #+ggtitle("Fig 3: Income vs. Total Spend by Cluster")
+                     
+inc_plt
+```
